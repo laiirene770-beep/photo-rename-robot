@@ -1,27 +1,89 @@
+const UNIT_LIST=[
+"ER",
+"OR",
+"SICU",
+"MICU",
+"ICU",
+"WARD"
+];
 
-export async function extractLabel(image) {
-  const canvas = document.createElement("canvas");
-  canvas.width = image.width;
-  canvas.height = image.height;
+async function processImage(file){
 
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(image, 0, 0);
+    const img=await loadImage(file);
 
-  // 只掃描右下角區域
-  const sx = Math.floor(image.width * 0.45);
-  const sy = Math.floor(image.height * 0.35);
-  const sw = image.width - sx;
-  const sh = image.height - sy;
+    const canvas=document.getElementById("canvas");
+    const ctx=canvas.getContext("2d");
 
-  const out = document.createElement("canvas");
-  out.width = sw * 2;
-  out.height = sh * 2;
+    canvas.width=img.width;
+    canvas.height=img.height;
 
-  out.getContext("2d").drawImage(
-    canvas,
-    sx, sy, sw, sh,
-    0, 0, out.width, out.height
-  );
+    ctx.drawImage(img,0,0);
 
-  return out;
+    const {
+        data:{text}
+    }=await Tesseract.recognize(canvas,"eng",{
+        logger:m=>console.log(m)
+    });
+
+    const raw=text.toUpperCase();
+
+    const unit=findUnit(raw);
+
+    const numbers=raw.replace(/[^0-9]/g," ");
+
+    const id5=findFive(numbers);
+
+    const id6=findSix(numbers);
+
+    return{
+        unit,
+        id5,
+        id6,
+        filename:`${unit}_${id5}_${id6}.jpg`
+    };
+
+}
+
+function loadImage(file){
+
+    return new Promise(resolve=>{
+
+        const img=new Image();
+
+        img.onload=()=>resolve(img);
+
+        img.src=URL.createObjectURL(file);
+
+    });
+
+}
+
+function findUnit(text){
+
+    for(const u of UNIT_LIST){
+
+        if(text.includes(u)) return u;
+
+    }
+
+    if(text.includes("EMERGENCY")) return "ER";
+
+    return "UNKNOWN";
+
+}
+
+function findFive(text){
+
+    const m=text.match(/\b\d{5}\b/);
+
+    return m?m[0]:"-----";
+
+}
+
+function findSix(text){
+
+    const m=text.match(/\b\d{6}\b/);
+
+    return m?m[0]:"------";
+
 }
