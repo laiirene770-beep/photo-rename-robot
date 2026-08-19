@@ -1,1 +1,25 @@
-<!doctype html><html lang='zh-Hant'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>定位器盤點 V3</title><link rel='stylesheet' href='style.css'><script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'></script><body><div class='wrap'><h1>🏥 輔大定位器盤點系統 V3</h1><input id='files' type='file' multiple accept='image/*'><button id='scan'>開始辨識</button><button id='zip'>下載ZIP</button><button id='xls'>Excel</button><p id='msg'>請選擇照片</p><div id='cards'></div></div><script src='app.js'></script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>定位器盤點系統 V3</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+<h1>🏥 輔大定位器盤點系統 V3</h1>
+<input id="files" type="file" multiple accept="image/*">
+<div class="btns">
+<button id="scan">開始辨識</button>
+<button id="zip">下載 ZIP</button>
+<button id="excel">下載 Excel</button>
+</div>
+<p id="status">請選擇照片後開始辨識</p>
+<div id="cards"></div>
+</div>
+<script src="app.js"></script>
+</body></html>
