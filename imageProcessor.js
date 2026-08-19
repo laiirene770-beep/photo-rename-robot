@@ -1,10 +1,11 @@
-const UNIT_LIST=[
+const UNITS=[
 "ER",
 "OR",
 "SICU",
 "MICU",
 "ICU",
-"WARD"
+"NICU",
+"PICU"
 ];
 
 async function processImage(file){
@@ -19,21 +20,21 @@ async function processImage(file){
 
     ctx.drawImage(img,0,0);
 
-    const {
-        data:{text}
-    }=await Tesseract.recognize(canvas,"eng",{
-        logger:m=>console.log(m)
-    });
+    const result=await Tesseract.recognize(
+        canvas,
+        "eng",
+        {
+            logger:m=>console.log(m)
+        }
+    );
 
-    const raw=text.toUpperCase();
+    const text=result.data.text.toUpperCase();
 
-    const unit=findUnit(raw);
+    const unit=findUnit(text);
 
-    const numbers=raw.replace(/[^0-9]/g," ");
+    const id6=find6(text);
 
-    const id5=findFive(numbers);
-
-    const id6=findSix(numbers);
+    const id5=find5(text);
 
     return{
         unit,
@@ -60,10 +61,8 @@ function loadImage(file){
 
 function findUnit(text){
 
-    for(const u of UNIT_LIST){
-
+    for(const u of UNITS){
         if(text.includes(u)) return u;
-
     }
 
     if(text.includes("EMERGENCY")) return "ER";
@@ -72,18 +71,18 @@ function findUnit(text){
 
 }
 
-function findFive(text){
+function find5(text){
 
-    const m=text.match(/\b\d{5}\b/);
+    const all=text.match(/\d{5}/g);
 
-    return m?m[0]:"-----";
+    return all?all[0]:"-----";
 
 }
 
-function findSix(text){
+function find6(text){
 
-    const m=text.match(/\b\d{6}\b/);
+    const all=text.match(/\d{6}/g);
 
-    return m?m[0]:"------";
+    return all?all[0]:"------";
 
 }

@@ -12,14 +12,16 @@ async function startOCR(){
 
     for(let i=0;i<files.length;i++){
 
-        document.getElementById("status").innerText=
-        `辨識中 ${i+1}/${files.length}`;
+        status.innerText=`辨識中 ${i+1}/${files.length}`;
 
         const result=await processImage(files[i]);
 
-        const tr=document.createElement("tr");
+        const url=URL.createObjectURL(files[i]);
 
-        tr.innerHTML=`
+        const row=document.createElement("tr");
+
+        row.innerHTML=`
+        <td><img src="${url}" class="preview"></td>
         <td>${files[i].name}</td>
         <td>${result.unit}</td>
         <td>${result.id5}</td>
@@ -27,10 +29,10 @@ async function startOCR(){
         <td>${result.filename}</td>
         `;
 
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
 
     }
 
-    document.getElementById("status").innerText="✅ 全部完成";
+    status.innerText="✅ 全部完成";
 
 }
