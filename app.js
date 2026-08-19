@@ -6,99 +6,128 @@ const status = document.getElementById("status");
 
 let resultData = [];
 
-// OCR 辨識
-async function recognizePhoto(file) {
+// ===== 醫院單位字典 =====
+const UNIT_LIST = [
+  "SICU",
+  "MICU",
+  "PICU",
+  "NICU",
+  "ICU",
+  "ER",
+  "OR"
+];
+
+// ===== OCR =====
+async function recognizePhoto(file){
 
   const img = new Image();
   img.src = URL.createObjectURL(file);
   await img.decode();
 
-  // 取得白色標籤
-  const labelCanvas = await extractLabel(img);
+  const label = await extractLabel(img);
 
   const result = await Tesseract.recognize(
-    labelCanvas,
+    label,
     "chi_tra+eng",
     {
       tessedit_pageseg_mode: "6",
       tessedit_char_whitelist:
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz輔大ERICUSO"
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz輔大"
     }
   );
 
-  const text = result.data.text.replace(/\s+/g, " ");
+  const raw = result.data.text;
 
-  // ---------- 單位 ----------
-  let unit = "未知單位";
+  // 去空白
+  const text = raw.replace(/\s+/g,"");
 
-  if (text.includes("輔大")) unit = "輔大ER";
-  else if (text.includes("ER")) unit = "輔大ER";
-  else if (text.includes("ICU")) unit = "ICU";
-  else if (text.includes("SICU")) unit = "SICU";
-  else if (text.includes("OR")) unit = "OR";
+  // ---------- 修正常見OCR ----------
+  let clean = text
+    .toUpperCase()
+    .replace(/0R/g,"OR")
+    .replace(/E[D0]/g,"ER")
+    .replace(/1CU/g,"ICU")
+    .replace(/S1CU/g,"SICU")
+    .replace(/M1CU/g,"MICU")
+    .replace(/P1CU/g,"PICU")
+    .replace(/N1CU/g,"NICU");
+
+  // ---------- 判斷單位 ----------
+  let dept = "";
+
+  for(const u of UNIT_LIST){
+    if(clean.includes(u)){
+      dept = u;
+      break;
+    }
+  }
+
+  let unit = dept ? `輔大${dept}` : "未知單位";
 
   // ---------- 5碼 ----------
-  let locator = (text.match(/\d{5}/) || [""])[0];
+  let locator = (clean.match(/\d{5}/) || [""])[0];
 
   // ---------- 6碼 ----------
-  let asset = (text.match(/\d{6}/) || [""])[0];
+  let asset = (clean.match(/\d{6}/) || [""])[0];
 
-  // 常見 OCR 修正
   locator = locator
-    .replace(/O/g, "0")
-    .replace(/S/g, "5")
-    .replace(/G/g, "6")
-    .replace(/I/g, "1");
+    .replace(/O/g,"0")
+    .replace(/I/g,"1")
+    .replace(/S/g,"5")
+    .replace(/G/g,"6");
 
   asset = asset
-    .replace(/O/g, "0")
-    .replace(/S/g, "5")
-    .replace(/G/g, "6")
-    .replace(/I/g, "1");
+    .replace(/O/g,"0")
+    .replace(/I/g,"1")
+    .replace(/S/g,"5")
+    .replace(/G/g,"6");
 
-  return {
+  // 若單位沒讀到，但數字完整，預設輔大ER
+  if(unit==="未知單位" && locator.length===5 && asset.length===6){
+    unit="輔大ER";
+  }
+
+  return{
     unit,
     locator,
     asset,
-    preview: URL.createObjectURL(file)
+    preview:URL.createObjectURL(file)
   };
 }
 
-// 開始辨識
-document.getElementById("scan").onclick = async () => {
+// ===== 開始辨識 =====
+document.getElementById("scan").onclick = async()=>{
 
-  cards.innerHTML = "";
-  resultData = [];
+  cards.innerHTML="";
+  resultData=[];
 
-  const list = [...files.files];
+  const list=[...files.files];
 
-  if (list.length === 0) {
-    alert("請先選擇照片！");
+  if(list.length===0){
+    alert("請先選擇照片");
     return;
   }
 
-  for (let i = 0; i < list.length; i++) {
+  for(let i=0;i<list.length;i++){
 
-    const file = list[i];
+    status.textContent=`辨識中 ${i+1}/${list.length}`;
 
-    status.textContent =
-      `辨識中 ${i + 1} / ${list.length}`;
+    const file=list[i];
+    const data=await recognizePhoto(file);
 
-    const data = await recognizePhoto(file);
-
-    const row = {
+    const row={
       file,
-      ext: file.name.split(".").pop(),
-      original: file.name,
+      ext:file.name.split(".").pop(),
+      original:file.name,
       ...data
     };
 
     resultData.push(row);
 
-    const card = document.createElement("div");
-    card.className = "card";
+    const card=document.createElement("div");
+    card.className="card";
 
-    card.innerHTML = `
+    card.innerHTML=`
       <img src="${data.preview}">
       <div>
 
@@ -122,79 +151,66 @@ document.getElementById("scan").onclick = async () => {
       </div>
     `;
 
-    const unit = card.querySelector(".unit");
-    const locator = card.querySelector(".locator");
-    const asset = card.querySelector(".asset");
+    const u=card.querySelector(".unit");
+    const l=card.querySelector(".locator");
+    const a=card.querySelector(".asset");
 
-    unit.oninput = e => row.unit = e.target.value;
-    locator.oninput = e => row.locator = e.target.value;
-    asset.oninput = e => row.asset = e.target.value;
+    u.oninput=e=>row.unit=e.target.value;
+    l.oninput=e=>row.locator=e.target.value;
+    a.oninput=e=>row.asset=e.target.value;
 
     cards.appendChild(card);
   }
 
-  status.textContent =
-    `完成，共 ${resultData.length} 張照片`;
+  status.textContent=`完成 ${resultData.length} 張`;
 };
 
-// ZIP
-document.getElementById("zip").onclick = async () => {
+// ===== ZIP =====
+document.getElementById("zip").onclick = async()=>{
 
-  if (resultData.length === 0) {
-    alert("尚未辨識！");
+  if(resultData.length===0){
+    alert("請先辨識");
     return;
   }
 
-  const zip = new JSZip();
+  const zip=new JSZip();
 
-  for (const r of resultData) {
+  for(const r of resultData){
 
-    const filename =
+    const filename=
       `${r.unit}-${r.locator}-${r.asset}.${r.ext}`;
 
-    zip.file(
-      filename,
-      await r.file.arrayBuffer()
-    );
+    zip.file(filename,await r.file.arrayBuffer());
   }
 
-  const blob =
-    await zip.generateAsync({ type: "blob" });
+  const blob=await zip.generateAsync({type:"blob"});
 
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "重新命名照片.zip";
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="重新命名照片.zip";
   a.click();
 };
 
-// Excel
-document.getElementById("excel").onclick = () => {
+// ===== Excel =====
+document.getElementById("excel").onclick=()=>{
 
-  if (resultData.length === 0) {
-    alert("尚未辨識！");
+  if(resultData.length===0){
+    alert("請先辨識");
     return;
   }
 
-  const rows = resultData.map(r => ({
-    原始檔名: r.original,
-    單位: r.unit,
-    定位器編號: r.locator,
-    財產編號: r.asset,
-    新檔名:
-      `${r.unit}-${r.locator}-${r.asset}.${r.ext}`
+  const rows=resultData.map(r=>({
+    原始檔名:r.original,
+    單位:r.unit,
+    定位器編號:r.locator,
+    財產編號:r.asset,
+    新檔名:`${r.unit}-${r.locator}-${r.asset}.${r.ext}`
   }));
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
 
-  XLSX.utils.book_append_sheet(
-    wb,
-    ws,
-    "盤點結果"
-  );
+  XLSX.utils.book_append_sheet(wb,ws,"盤點結果");
 
-  XLSX.writeFile(
-    wb,
-    "辨識結果.xlsx"
-  );
+  XLSX.writeFile(wb,"辨識結果.xlsx");
 };
