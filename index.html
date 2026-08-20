@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Photo Rename Robot V5.0</title>
 
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css">
 
   <!-- OCR -->
   <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -22,171 +22,132 @@
 
 <div class="container">
 
-    <!-- ===== Header ===== -->
+  <!-- Header -->
+  <header>
+    <h1>📷 Photo Rename Robot V5.0</h1>
+    <p>輔大設備照片 AI 辨識系統</p>
+  </header>
 
-    <header>
+  <!-- 上傳區 -->
+  <section class="upload-card">
 
-        <h1>📷 Photo Rename Robot V5.0</h1>
+    <div id="dropZone" class="drop-zone">
 
-        <p>
-            輔大設備照片 AI 辨識系統
-        </p>
+      <div class="upload-icon">📁</div>
 
-    </header>
+      <h2>拖曳照片或資料夾到這裡</h2>
 
-    <!-- ===== Upload Area ===== -->
+      <p>支援 JPG / JPEG / PNG</p>
 
-    <section class="upload-card">
+      <!-- 修正版 -->
+      <input
+        id="fileInput"
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+      >
 
-        <div id="dropZone" class="drop-zone">
+      <button id="selectBtn">
+        選擇照片
+      </button>
 
-            <div class="upload-icon">📁</div>
+    </div>
 
-            <h2>拖曳照片或資料夾到這裡</h2>
+  </section>
 
-            <p>支援 JPG / JPEG / PNG</p>
+  <!-- 進度 -->
+  <section class="progress-card">
 
-            <input
-                id="fileInput"
-                type="file"
-                webkitdirectory
-                directory
-                multiple
-                hidden
-            />
+    <div class="progress-top">
+      <span>辨識進度</span>
+      <span id="progressText">0%</span>
+    </div>
 
-            <button id="selectBtn">
-                選擇資料夾
-            </button>
+    <div class="progress-bar">
+      <div id="progressFill"></div>
+    </div>
 
-        </div>
+  </section>
 
-    </section>
+  <!-- 縮圖 -->
+  <section class="preview-card">
 
-    <!-- ===== Progress ===== -->
+    <div class="section-title">
+      <h2>照片預覽</h2>
+      <span id="photoCount">0 張</span>
+    </div>
 
-    <section class="progress-card">
+    <div id="previewGrid" class="preview-grid"></div>
 
-        <div class="progress-top">
+  </section>
 
-            <span>辨識進度</span>
+  <!-- 結果 -->
+  <section class="result-card">
 
-            <span id="progressText">0%</span>
+    <div class="section-title">
+      <h2>辨識結果</h2>
+    </div>
 
-        </div>
+    <div class="table-wrapper">
 
-        <div class="progress-bar">
+      <table>
 
-            <div id="progressFill"></div>
+        <thead>
+          <tr>
+            <th>照片</th>
+            <th>單位</th>
+            <th>定位器</th>
+            <th>財產編號</th>
+            <th>信心</th>
+          </tr>
+        </thead>
 
-        </div>
+        <tbody id="resultBody">
 
-    </section>
+          <tr class="empty-row">
+            <td colspan="5">尚未載入照片</td>
+          </tr>
 
-    <!-- ===== Preview ===== -->
+        </tbody>
 
-    <section class="preview-card">
+      </table>
 
-        <div class="section-title">
+    </div>
 
-            <h2>照片預覽</h2>
+  </section>
 
-            <span id="photoCount">0 張</span>
+  <!-- 按鈕 -->
+  <section class="action-card">
 
-        </div>
+    <button id="startBtn" class="primary">
+      🔍 開始辨識
+    </button>
 
-        <div id="previewGrid" class="preview-grid"></div>
+    <button id="excelBtn" disabled>
+      📄 匯出 Excel
+    </button>
 
-    </section>
+    <button id="zipBtn" disabled>
+      📦 下載 ZIP
+    </button>
 
-    <!-- ===== Result ===== -->
-
-    <section class="result-card">
-
-        <div class="section-title">
-
-            <h2>辨識結果</h2>
-
-        </div>
-
-        <div class="table-wrapper">
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>照片</th>
-
-                        <th>單位</th>
-
-                        <th>定位器</th>
-
-                        <th>財產編號</th>
-
-                        <th>信心</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody id="resultBody">
-
-                    <tr class="empty-row">
-
-                        <td colspan="5">
-                            尚未載入照片
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </section>
-
-    <!-- ===== Bottom Buttons ===== -->
-
-    <section class="action-card">
-
-        <button id="startBtn" class="primary">
-
-            🔍 開始辨識
-
-        </button>
-
-        <button id="excelBtn" disabled>
-
-            📄 匯出 Excel
-
-        </button>
-
-        <button id="zipBtn" disabled>
-
-            📦 下載 ZIP
-
-        </button>
-
-    </section>
+  </section>
 
 </div>
 
 <!-- Loading -->
-
 <div id="loading" class="loading hidden">
 
-    <div class="spinner"></div>
+  <div class="spinner"></div>
 
-    <p id="loadingText">AI 辨識中...</p>
+  <p id="loadingText">
+    AI 辨識中...
+  </p>
 
 </div>
 
 <!-- JS -->
-
 <script src="validator.js"></script>
 <script src="imageProcessor.js"></script>
 <script src="ocrEngine.js"></script>
