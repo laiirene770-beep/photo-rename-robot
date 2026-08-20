@@ -93,24 +93,17 @@ function validateLocator(text){
    財產編號 6碼
 -------------------------- */
 
-function validateAsset(raw){
+function validateAsset(text){
 
-  let text = normalizeDigits(raw);
+    text = normalizeDigits(text);
 
-  text = text.replace(/\D/g,"");
+    text = text.replace(/\D/g,"");
 
-  if(text.length > 6){
-      text = text.substring(0,6);
-  }
+    const m = text.match(/\d{6}/);
 
-  while(text.length < 6){
-      text = "0" + text;
-  }
-
-  return text;
+    return m ? m[0] : "000000";
 
 }
-
 /* -------------------------
    數字容錯
 -------------------------- */
