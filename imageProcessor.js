@@ -520,41 +520,36 @@ function sharpen(canvas){
 
 function splitRegions(canvas){
 
-    const w=canvas.width;
-    const h=canvas.height;
-
-    const top=Math.floor(h*0.05);
-
-    const unitH=Math.floor(h*0.30);
-
-    const locatorH=Math.floor(h*0.26);
-
-    const assetH=Math.floor(h*0.26);
+    const w = canvas.width;
+    const h = canvas.height;
 
     return{
 
+        // 第一行：輔大ER
         unit: cropArea(
             canvas,
             0,
-            top,
+            Math.floor(h*0.08),
             w,
-            unitH
+            Math.floor(h*0.24)
         ),
 
+        // 第二行：36846
         locator: cropArea(
             canvas,
             0,
-            top+unitH,
+            Math.floor(h*0.34),
             w,
-            locatorH
+            Math.floor(h*0.22)
         ),
 
+        // 第三行：000021
         asset: cropArea(
             canvas,
             0,
-            top+unitH+locatorH,
+            Math.floor(h*0.58),
             w,
-            assetH
+            Math.floor(h*0.22)
         )
 
     };
