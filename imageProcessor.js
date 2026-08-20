@@ -172,7 +172,82 @@ function detectWhiteLabel(canvas){
     };
 
 }
+function detectWhiteLabel(canvas){
 
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const img = ctx.getImageData(0,0,w,h);
+    const d = img.data;
+
+    let best = {
+        score:0,
+        x:Math.floor(w*0.58),
+        y:Math.floor(h*0.56),
+        width:Math.floor(w*0.30),
+        height:Math.floor(h*0.22)
+    };
+
+    const rw = Math.floor(w*0.30);
+    const rh = Math.floor(h*0.22);
+
+    for(let y=Math.floor(h*0.40); y<Math.floor(h*0.80); y+=10){
+
+        for(let x=Math.floor(w*0.45); x<Math.floor(w*0.85); x+=10){
+
+            let white = 0;
+            let total = 0;
+
+            for(let yy=0; yy<rh; yy+=5){
+
+                for(let xx=0; xx<rw; xx+=5){
+
+                    const px = x + xx;
+                    const py = y + yy;
+
+                    if(px>=w || py>=h) continue;
+
+                    const i = (py*w+px)*4;
+
+                    const r = d[i];
+                    const g = d[i+1];
+                    const b = d[i+2];
+
+                    total++;
+
+                    if(r>215 && g>215 && b>215){
+                        white++;
+                    }
+
+                }
+
+            }
+
+            const score = white / total;
+
+            if(score > best.score){
+
+                best = {
+                    score,
+                    x,
+                    y,
+                    width:rw,
+                    height:rh
+                };
+
+            }
+
+        }
+
+    }
+
+    return best;
+
+}
 /* -----------------------------
    找不到時備援
 ------------------------------ */
