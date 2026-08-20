@@ -1,6 +1,6 @@
 /* ==========================================
    Photo Rename Robot V5.0
-   app.js
+   app.js（完整版）
 ========================================== */
 
 const dropZone = document.getElementById("dropZone");
@@ -25,57 +25,75 @@ const photoCount = document.getElementById("photoCount");
 let photos = [];
 let results = [];
 
-/* -------------------------
-   Upload
--------------------------- */
+/* ==========================================
+   上傳 / 拖曳
+========================================== */
 
-selectBtn.onclick = () => fileInput.click();
+// 點擊選擇
+selectBtn.addEventListener("click", () => {
+    fileInput.click();
+});
 
-fileInput.onchange = e => {
-    loadFiles([...e.target.files]);
-};
+// 選擇完成
+fileInput.addEventListener("change", (e) => {
+    loadFiles(Array.from(e.target.files));
+});
 
-dropZone.ondragover = e => {
-    e.preventDefault();
+// 防止瀏覽器開啟圖片
+["dragenter","dragover","dragleave","drop"].forEach(eventName=>{
+    document.addEventListener(eventName,(e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+    },false);
+});
+
+// 拖曳效果
+dropZone.addEventListener("dragenter",()=>{
     dropZone.classList.add("dragover");
-};
+});
 
-dropZone.ondragleave = () => {
+dropZone.addEventListener("dragover",()=>{
+    dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave",()=>{
     dropZone.classList.remove("dragover");
-};
+});
 
-dropZone.ondrop = e => {
-
-    e.preventDefault();
+// 放開
+dropZone.addEventListener("drop",(e)=>{
 
     dropZone.classList.remove("dragover");
 
-    loadFiles([...e.dataTransfer.files]);
+    const files = Array.from(e.dataTransfer.files).filter(file=>{
+        return file.type.startsWith("image/");
+    });
 
-};
+    loadFiles(files);
 
-/* -------------------------
-   Load Images
--------------------------- */
+});
+
+/* ==========================================
+   載入圖片
+========================================== */
 
 function loadFiles(files){
 
-    photos = files.filter(f=>{
+    photos = files.filter(file=>file.type.startsWith("image/"));
 
-        return /image/i.test(f.type);
+    results=[];
 
-    });
+    previewGrid.innerHTML="";
+    resultBody.innerHTML="";
 
-    results = [];
+    progressFill.style.width="0%";
+    progressText.innerText="0%";
 
-    previewGrid.innerHTML = "";
-    resultBody.innerHTML = "";
-
-    photoCount.innerText = photos.length + " 張";
+    photoCount.innerText=`${photos.length} 張`;
 
     if(photos.length===0){
 
-        resultBody.innerHTML = `
+        resultBody.innerHTML=`
         <tr class="empty-row">
             <td colspan="5">沒有圖片</td>
         </tr>`;
@@ -83,16 +101,16 @@ function loadFiles(files){
         return;
     }
 
-    photos.forEach(file=>{
+    photos.forEach((file,index)=>{
 
-        const reader = new FileReader();
+        const reader=new FileReader();
 
-        reader.onload = e=>{
+        reader.onload=(e)=>{
 
-            const div = document.createElement("div");
-            div.className = "preview-item";
+            const div=document.createElement("div");
+            div.className="preview-item";
 
-            div.innerHTML = `
+            div.innerHTML=`
                 <img src="${e.target.result}">
                 <div class="preview-name">${file.name}</div>
             `;
@@ -103,20 +121,14 @@ function loadFiles(files){
 
         reader.readAsDataURL(file);
 
-    });
+        const tr=document.createElement("tr");
 
-    resultBody.innerHTML = "";
-
-    photos.forEach(file=>{
-
-        const tr = document.createElement("tr");
-
-        tr.innerHTML = `
-        <td>${file.name}</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
+        tr.innerHTML=`
+            <td>${file.name}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
         `;
 
         resultBody.appendChild(tr);
@@ -125,16 +137,17 @@ function loadFiles(files){
 
 }
 
-/* -------------------------
-   OCR Start
--------------------------- */
+/* ==========================================
+   開始辨識
+========================================== */
 
-startBtn.onclick = async()=>{
+startBtn.addEventListener("click", async()=>{
 
     if(photos.length===0){
 
-        alert("請先加入照片");
+        alert("請先加入照片！");
         return;
+
     }
 
     loading.classList.remove("hidden");
@@ -143,19 +156,36 @@ startBtn.onclick = async()=>{
 
     for(let i=0;i<photos.length;i++){
 
-        loadingText.innerText =
+        loadingText.innerText=
         `辨識中 ${i+1}/${photos.length}`;
 
-        const result = await processImage(photos[i]);
+        try{
 
-        results.push(result);
+            const result=await processImage(photos[i]);
 
-        updateRow(i,result);
+            results.push(result);
 
-        const p = Math.round((i+1)/photos.length*100);
+            updateRow(i,result);
 
-        progressFill.style.width = p+"%";
-        progressText.innerText = p+"%";
+        }catch(err){
+
+            console.error(err);
+
+            results.push({
+                unit:"辨識失敗",
+                locator:"00000",
+                asset:"000000",
+                confidence:0
+            });
+
+            updateRow(i,results[i]);
+
+        }
+
+        const percent=Math.round(((i+1)/photos.length)*100);
+
+        progressFill.style.width=percent+"%";
+        progressText.innerText=percent+"%";
 
     }
 
@@ -164,45 +194,39 @@ startBtn.onclick = async()=>{
     excelBtn.disabled=false;
     zipBtn.disabled=false;
 
-    alert("辨識完成！");
+    alert(`完成！共辨識 ${photos.length} 張照片`);
 
-};
+});
 
-/* -------------------------
-   Update Table
--------------------------- */
+/* ==========================================
+   更新表格
+========================================== */
 
 function updateRow(index,data){
 
-    const row = resultBody.rows[index];
+    const row=resultBody.rows[index];
 
     row.innerHTML=`
+        <td>${photos[index].name}</td>
 
-    <td>${photos[index].name}</td>
+        <td>
+            <input value="${data.unit}">
+        </td>
 
-    <td>
-      <input value="${data.unit}">
-    </td>
+        <td>
+            <input value="${data.locator}">
+        </td>
 
-    <td>
-      <input value="${data.locator}">
-    </td>
+        <td>
+            <input value="${data.asset}">
+        </td>
 
-    <td>
-      <input value="${data.asset}">
-    </td>
-
-    <td class="${scoreClass(data.confidence)}">
-      ${data.confidence}%
-    </td>
-
+        <td class="${scoreClass(data.confidence)}">
+            ${data.confidence}%
+        </td>
     `;
 
 }
-
-/* -------------------------
-   Confidence Color
--------------------------- */
 
 function scoreClass(score){
 
@@ -214,24 +238,24 @@ function scoreClass(score){
 
 }
 
-/* -------------------------
+/* ==========================================
    Excel
--------------------------- */
+========================================== */
 
-excelBtn.onclick=()=>{
+excelBtn.addEventListener("click",()=>{
 
     const rows=[[
         "原始照片",
         "單位",
         "定位器",
         "財產編號",
-        "信心值"
+        "信心"
     ]];
 
-    [...resultBody.rows].forEach((row,i)=>{
+    Array.from(resultBody.rows).forEach((row,index)=>{
 
         rows.push([
-            photos[i].name,
+            photos[index].name,
             row.cells[1].firstElementChild.value,
             row.cells[2].firstElementChild.value,
             row.cells[3].firstElementChild.value,
@@ -240,53 +264,57 @@ excelBtn.onclick=()=>{
 
     });
 
-    const wb = XLSX.utils.book_new();
+    const wb=XLSX.utils.book_new();
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const ws=XLSX.utils.aoa_to_sheet(rows);
 
     XLSX.utils.book_append_sheet(wb,ws,"OCR");
 
     XLSX.writeFile(wb,"辨識結果.xlsx");
 
-};
+});
 
-/* -------------------------
-   ZIP Rename
--------------------------- */
+/* ==========================================
+   ZIP 重新命名
+========================================== */
 
-zipBtn.onclick=async()=>{
+zipBtn.addEventListener("click",async()=>{
 
-    const zip = new JSZip();
+    const zip=new JSZip();
 
     for(let i=0;i<photos.length;i++){
 
-        const row = resultBody.rows[i];
+        const row=resultBody.rows[i];
 
-        const unit = row.cells[1].firstElementChild.value;
+        const unit=row.cells[1].firstElementChild.value;
 
-        const locator = row.cells[2].firstElementChild.value;
+        const locator=row.cells[2].firstElementChild.value;
 
-        const asset = row.cells[3].firstElementChild.value;
+        const asset=row.cells[3].firstElementChild.value;
 
-        const ext = photos[i].name.split(".").pop();
+        const ext=photos[i].name.split(".").pop();
 
-        const newName =
+        const filename=
         `${unit}-${locator}-${asset}.${ext}`;
 
-        zip.file(newName,photos[i]);
+        zip.file(filename,photos[i]);
 
     }
 
-    const blob = await zip.generateAsync({
+    const blob=await zip.generateAsync({
         type:"blob"
     });
 
-    const a = document.createElement("a");
+    const url=URL.createObjectURL(blob);
 
-    a.href = URL.createObjectURL(blob);
+    const a=document.createElement("a");
+
+    a.href=url;
 
     a.download="重新命名照片.zip";
 
     a.click();
 
-};
+    URL.revokeObjectURL(url);
+
+});
