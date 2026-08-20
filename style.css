@@ -1,6 +1,0 @@
-body{font-family:'Microsoft JhengHei';background:#eef2f7;margin:0}
-.wrap{max-width:1000px;margin:20px auto;background:#fff;padding:20px;border-radius:12px}
-.btns{margin:10px 0}button{padding:10px 16px;margin-right:8px;background:#1976d2;color:#fff;border:0;border-radius:8px}
-.card{display:grid;grid-template-columns:140px 1fr;gap:12px;border:1px solid #ddd;padding:12px;border-radius:10px;margin-top:12px}
-.card img{width:140px;height:140px;object-fit:cover;border-radius:8px}
-.row{display:flex;align-items:center;margin:6px 0}.row label{width:90px;font-weight:bold}.row input{flex:1;padding:6px}
