@@ -1,56 +1,15 @@
 /* ==========================================
-   Photo Rename Robot V5.1
+   Photo Rename Robot V6.0
    imageProcessor.js
-   Part 4A / 3
+   Part A (1~170)
 ========================================== */
 
-let cvReady = false;
-
-/* -----------------------------
-   初始化 OpenCV
------------------------------- */
-
-async function initOpenCV(){
-
-    if(cvReady) return;
-
-    return new Promise((resolve)=>{
-
-        if(window.cv){
-
-            cv["onRuntimeInitialized"]=()=>{
-
-                cvReady=true;
-                resolve();
-
-            };
-
-        }else{
-
-            const script=document.createElement("script");
-
-            script.src="https://docs.opencv.org/4.x/opencv.js";
-
-            script.async=true;
-
-            script.onload=()=>{
-
-                cv["onRuntimeInitialized"]=()=>{
-
-                    cvReady=true;
-                    resolve();
-
-                };
-
-            };
-
-            document.body.appendChild(script);
-
-        }
-
-    });
-
-}
+const LABEL_CONFIG = {
+    searchX: 0.42,
+    searchY: 0.35,
+    minWhite: 225,
+    scale: 4
+};
 
 /* -----------------------------
    主流程
@@ -58,32 +17,32 @@ async function initOpenCV(){
 
 async function processImage(file){
 
-    await initOpenCV();
+    const image = await loadImage(file);
 
-    const img=await loadImage(file);
+    const source = createCanvas(
+        image.width,
+        image.height
+    );
 
-    const srcCanvas=document.createElement("canvas");
-    const ctx=srcCanvas.getContext("2d");
+    const sctx = source.getContext("2d",{
+        willReadFrequently:true
+    });
 
-    srcCanvas.width=img.width;
-    srcCanvas.height=img.height;
+    sctx.drawImage(image,0,0);
 
-    ctx.drawImage(img,0,0);
+    const roi = detectWhiteLabel(source);
 
-    // 找白框
-    const roi=findWhiteLabel(srcCanvas);
+    const crop = cropCanvas(source,roi);
 
-    // 裁切
-    const crop=cropCanvas(srcCanvas,roi);
+    const enhanced = enhanceCanvas(crop);
 
-    // 下一段會做前處理
-    const clean=preprocessROI(crop);
+    const regions = splitRegions(enhanced);
 
-    // 切三行
-    const regions=splitRegions(clean);
+    const result = await recognizeRegions(regions);
 
-    // OCR
-    const result=await recognizeRegions(regions);
+    cleanupCanvas(source);
+    cleanupCanvas(crop);
+    cleanupCanvas(enhanced);
 
     return result;
 
@@ -95,92 +54,90 @@ async function processImage(file){
 
 function loadImage(file){
 
-    return new Promise(resolve=>{
+    return new Promise((resolve,reject)=>{
 
-        const img=new Image();
+        const img = new Image();
 
-        img.onload=()=>resolve(img);
+        img.onload = ()=>resolve(img);
 
-        img.src=URL.createObjectURL(file);
+        img.onerror = reject;
+
+        img.src = URL.createObjectURL(file);
 
     });
 
 }
 
 /* -----------------------------
-   OpenCV 找白色標籤
+   建立 Canvas
 ------------------------------ */
 
-function findWhiteLabel(canvas){
+function createCanvas(w,h){
 
-    const src=cv.imread(canvas);
+    const canvas = document.createElement("canvas");
 
-    const gray=new cv.Mat();
+    canvas.width = w;
+    canvas.height = h;
 
-    const blur=new cv.Mat();
+    return canvas;
 
-    const binary=new cv.Mat();
+}
 
-    cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+/* -----------------------------
+   找白色標籤
+------------------------------ */
 
-    cv.GaussianBlur(
-        gray,
-        blur,
-        new cv.Size(5,5),
-        0
+function detectWhiteLabel(canvas){
+
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const img = ctx.getImageData(0,0,w,h);
+
+    const d = img.data;
+
+    const startX = Math.floor(
+        w*LABEL_CONFIG.searchX
     );
 
-    cv.threshold(
-        blur,
-        binary,
-        210,
-        255,
-        cv.THRESH_BINARY
+    const startY = Math.floor(
+        h*LABEL_CONFIG.searchY
     );
 
-    const contours=new cv.MatVector();
-    const hierarchy=new cv.Mat();
+    let minX = w;
+    let minY = h;
+    let maxX = 0;
+    let maxY = 0;
 
-    cv.findContours(
-        binary,
-        contours,
-        hierarchy,
-        cv.RETR_EXTERNAL,
-        cv.CHAIN_APPROX_SIMPLE
-    );
+    let pixels = 0;
 
-    let best=null;
-    let bestArea=0;
+    for(let y=startY;y<h;y++){
 
-    for(let i=0;i<contours.size();i++){
+        for(let x=startX;x<w;x++){
 
-        const cnt=contours.get(i);
+            const i = (y*w+x)*4;
 
-        const rect=cv.boundingRect(cnt);
+            const r=d[i];
+            const g=d[i+1];
+            const b=d[i+2];
 
-        const area=rect.width*rect.height;
-
-        const ratio=rect.width/rect.height;
-
-        // 白框條件
-        if(
-            area>15000 &&
-            ratio>1.8 &&
-            ratio<6
-        ){
-
-            // 偏右下
             if(
-                rect.x>canvas.width*0.35 &&
-                rect.y>canvas.height*0.25
+                r>LABEL_CONFIG.minWhite &&
+                g>LABEL_CONFIG.minWhite &&
+                b>LABEL_CONFIG.minWhite
             ){
 
-                if(area>bestArea){
+                pixels++;
 
-                    bestArea=area;
-                    best=rect;
+                if(x<minX) minX=x;
+                if(y<minY) minY=y;
 
-                }
+                if(x>maxX) maxX=x;
+                if(y>maxY) maxY=y;
 
             }
 
@@ -188,58 +145,74 @@ function findWhiteLabel(canvas){
 
     }
 
-    src.delete();
-    gray.delete();
-    blur.delete();
-    binary.delete();
-    contours.delete();
-    hierarchy.delete();
+    if(pixels<600){
 
-    if(best){
-
-        return{
-
-            x:Math.max(best.x-8,0),
-
-            y:Math.max(best.y-8,0),
-
-            width:Math.min(best.width+16,canvas.width),
-
-            height:Math.min(best.height+16,canvas.height)
-
-        };
+        return defaultROI(w,h);
 
     }
 
-    // 找不到時備援
-    return{
+    const pad = 14;
 
-        x:canvas.width*0.58,
+    return {
 
-        y:canvas.height*0.56,
+        x: Math.max(0,minX-pad),
 
-        width:canvas.width*0.34,
+        y: Math.max(0,minY-pad),
 
-        height:canvas.height*0.22
+        width: Math.min(
+            w-(minX-pad),
+            (maxX-minX)+pad*2
+        ),
+
+        height: Math.min(
+            h-(minY-pad),
+            (maxY-minY)+pad*2
+        )
 
     };
 
 }
 
 /* -----------------------------
-   Crop ROI
+   找不到時備援
 ------------------------------ */
 
-function cropCanvas(canvas,roi){
+function defaultROI(w,h){
 
-    const c=document.createElement("canvas");
-    const ctx=c.getContext("2d");
+    return{
 
-    c.width=roi.width;
-    c.height=roi.height;
+        x: Math.floor(w*0.60),
+
+        y: Math.floor(h*0.58),
+
+        width: Math.floor(w*0.32),
+
+        height: Math.floor(h*0.22)
+
+    };
+
+}
+/* ==========================================
+   Photo Rename Robot V6.0
+   imageProcessor.js
+   Part B (171~340)
+========================================== */
+
+/* -----------------------------
+   裁切白框
+------------------------------ */
+
+function cropCanvas(source, roi){
+
+    const canvas = createCanvas(
+        roi.width,
+        roi.height
+    );
+
+    const ctx = canvas.getContext("2d");
 
     ctx.drawImage(
-        canvas,
+        source,
         roi.x,
         roi.y,
         roi.width,
@@ -250,182 +223,238 @@ function cropCanvas(canvas,roi){
         roi.height
     );
 
-    return c;
-
-}
-/* ==========================================
-   Part 4B (Line 181~350)
-========================================== */
-
-/* -----------------------------
-   白框前處理
------------------------------- */
-
-function preprocessROI(canvas){
-
-    const src = cv.imread(canvas);
-
-    const gray = new cv.Mat();
-    const binary = new cv.Mat();
-    const opened = new cv.Mat();
-
-    // 灰階
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-    // 自適應二值化（比固定 threshold 更穩）
-    cv.adaptiveThreshold(
-        gray,
-        binary,
-        255,
-        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv.THRESH_BINARY,
-        31,
-        8
-    );
-
-    // 去除小雜訊
-    const kernel = cv.getStructuringElement(
-        cv.MORPH_RECT,
-        new cv.Size(2,2)
-    );
-
-    cv.morphologyEx(
-        binary,
-        opened,
-        cv.MORPH_OPEN,
-        kernel
-    );
-
-    // Deskew
-    const corrected = deskew(opened);
-
-    // 放大 4 倍
-    const enlarged = enlarge(corrected,4);
-
-    src.delete();
-    gray.delete();
-    binary.delete();
-    opened.delete();
-    corrected.delete();
-    kernel.delete();
-
-    return enlarged;
+    return canvas;
 
 }
 
 /* -----------------------------
-   Deskew
+   白框增強
 ------------------------------ */
 
-function deskew(mat){
+function enhanceCanvas(source){
 
-    const points = new cv.Mat();
-    cv.findNonZero(mat,points);
+    const scale = LABEL_CONFIG.scale;
 
-    if(points.rows < 10){
-
-        points.delete();
-        return mat.clone();
-
-    }
-
-    const box = cv.minAreaRect(points);
-
-    let angle = box.angle;
-
-    if(angle < -45){
-        angle += 90;
-    }
-
-    const center = new cv.Point(
-        mat.cols/2,
-        mat.rows/2
+    const canvas = createCanvas(
+        source.width * scale,
+        source.height * scale
     );
 
-    const M = cv.getRotationMatrix2D(
-        center,
-        angle,
-        1
-    );
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
 
-    const rotated = new cv.Mat();
+    ctx.imageSmoothingEnabled = false;
 
-    cv.warpAffine(
-        mat,
-        rotated,
-        M,
-        new cv.Size(mat.cols,mat.rows),
-        cv.INTER_LINEAR,
-        cv.BORDER_CONSTANT,
-        new cv.Scalar(255,255,255)
-    );
-
-    points.delete();
-    M.delete();
-
-    return rotated;
-
-}
-
-/* -----------------------------
-   放大
------------------------------- */
-
-function enlarge(mat,scale){
-
-    const dst = new cv.Mat();
-
-    cv.resize(
-        mat,
-        dst,
-        new cv.Size(
-            mat.cols*scale,
-            mat.rows*scale
-        ),
+    ctx.drawImage(
+        source,
         0,
         0,
-        cv.INTER_CUBIC
+        canvas.width,
+        canvas.height
     );
 
-    return dst;
+    grayscale(canvas);
 
-}
+    adaptiveThreshold(canvas);
 
-/* -----------------------------
-   OpenCV → Canvas
------------------------------- */
+    removeNoise(canvas);
 
-function matToCanvas(mat){
-
-    const canvas = document.createElement("canvas");
-
-    canvas.width = mat.cols;
-    canvas.height = mat.rows;
-
-    cv.imshow(canvas,mat);
+    sharpen(canvas);
 
     return canvas;
 
 }
 
 /* -----------------------------
-   三行切割
+   灰階
 ------------------------------ */
 
-function splitRegions(mat){
+function grayscale(canvas){
 
-    const canvas = matToCanvas(mat);
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
+
+    const img = ctx.getImageData(
+        0,0,canvas.width,canvas.height
+    );
+
+    const d = img.data;
+
+    for(let i=0;i<d.length;i+=4){
+
+        const gray =
+            d[i]*0.299 +
+            d[i+1]*0.587 +
+            d[i+2]*0.114;
+
+        d[i]=gray;
+        d[i+1]=gray;
+        d[i+2]=gray;
+
+    }
+
+    ctx.putImageData(img,0,0);
+
+}
+
+/* -----------------------------
+   Adaptive Threshold
+------------------------------ */
+
+function adaptiveThreshold(canvas){
+
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
 
     const w = canvas.width;
     const h = canvas.height;
 
-    const top = Math.floor(h*0.06);
+    const img = ctx.getImageData(0,0,w,h);
 
-    const unitHeight = Math.floor(h*0.30);
+    const d = img.data;
 
-    const locatorHeight = Math.floor(h*0.26);
+    const block = 15;
 
-    const assetHeight = Math.floor(h*0.26);
+    for(let y=0;y<h;y++){
+
+        for(let x=0;x<w;x++){
+
+            let sum=0;
+            let count=0;
+
+            for(let yy=-block;yy<=block;yy+=3){
+
+                const py=y+yy;
+
+                if(py<0 || py>=h) continue;
+
+                for(let xx=-block;xx<=block;xx+=3){
+
+                    const px=x+xx;
+
+                    if(px<0 || px>=w) continue;
+
+                    const idx=(py*w+px)*4;
+
+                    sum+=d[idx];
+                    count++;
+
+                }
+
+            }
+
+            const avg=sum/count;
+
+            const i=(y*w+x)*4;
+
+            const value=d[i]>(avg+10)?255:0;
+
+            d[i]=value;
+            d[i+1]=value;
+            d[i+2]=value;
+
+        }
+
+    }
+
+    ctx.putImageData(img,0,0);
+
+}
+
+/* -----------------------------
+   去雜點
+------------------------------ */
+
+function removeNoise(canvas){
+
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
+
+    const w=canvas.width;
+    const h=canvas.height;
+
+    const img=ctx.getImageData(0,0,w,h);
+
+    const d=img.data;
+
+    const copy=new Uint8ClampedArray(d);
+
+    for(let y=1;y<h-1;y++){
+
+        for(let x=1;x<w-1;x++){
+
+            let black=0;
+
+            for(let yy=-1;yy<=1;yy++){
+
+                for(let xx=-1;xx<=1;xx++){
+
+                    const idx=((y+yy)*w+(x+xx))*4;
+
+                    if(copy[idx]===0) black++;
+
+                }
+
+            }
+
+            const i=(y*w+x)*4;
+
+            const value=black>=5?0:255;
+
+            d[i]=value;
+            d[i+1]=value;
+            d[i+2]=value;
+
+        }
+
+    }
+
+    ctx.putImageData(img,0,0);
+
+}
+
+/* -----------------------------
+   銳利化
+------------------------------ */
+
+function sharpen(canvas){
+
+    const ctx = canvas.getContext("2d",{
+        willReadFrequently:true
+    });
+
+    ctx.filter="contrast(170%) brightness(105%)";
+
+    const img=ctx.getImageData(
+        0,0,canvas.width,canvas.height
+    );
+
+    ctx.putImageData(img,0,0);
+
+    ctx.filter="none";
+
+}
+
+/* -----------------------------
+   切成三行
+------------------------------ */
+
+function splitRegions(canvas){
+
+    const w=canvas.width;
+    const h=canvas.height;
+
+    const top=Math.floor(h*0.05);
+
+    const unitH=Math.floor(h*0.30);
+
+    const locatorH=Math.floor(h*0.26);
+
+    const assetH=Math.floor(h*0.26);
 
     return{
 
@@ -434,46 +463,46 @@ function splitRegions(mat){
             0,
             top,
             w,
-            unitHeight
+            unitH
         ),
 
         locator: cropArea(
             canvas,
             0,
-            top+unitHeight,
+            top+unitH,
             w,
-            locatorHeight
+            locatorH
         ),
 
         asset: cropArea(
             canvas,
             0,
-            top+unitHeight+locatorHeight,
+            top+unitH+locatorH,
             w,
-            assetHeight
+            assetH
         )
 
     };
 
 }
 /* ==========================================
-   Part 4C (Line 351~End)
+   Photo Rename Robot V6.0
+   imageProcessor.js
+   Part C (341~End)
 ========================================== */
 
 /* -----------------------------
-   Crop Canvas
+   Crop Area
 ------------------------------ */
 
-function cropArea(canvas,x,y,w,h){
+function cropArea(source,x,y,w,h){
 
-    const c=document.createElement("canvas");
-    const ctx=c.getContext("2d");
+    const canvas=createCanvas(w,h);
 
-    c.width=w;
-    c.height=h;
+    const ctx=canvas.getContext("2d");
 
     ctx.drawImage(
-        canvas,
+        source,
         x,
         y,
         w,
@@ -484,7 +513,7 @@ function cropArea(canvas,x,y,w,h){
         h
     );
 
-    return c;
+    return canvas;
 
 }
 
@@ -494,7 +523,9 @@ function cropArea(canvas,x,y,w,h){
 
 function evaluateROI(canvas){
 
-    const ctx=canvas.getContext("2d");
+    const ctx=canvas.getContext("2d",{
+        willReadFrequently:true
+    });
 
     const img=ctx.getImageData(
         0,
@@ -540,9 +571,15 @@ function enhanceIfNeeded(canvas){
 
     const score=evaluateROI(canvas);
 
-    if(score>18) return canvas;
+    if(score>18){
 
-    const ctx=canvas.getContext("2d");
+        return canvas;
+
+    }
+
+    const ctx=canvas.getContext("2d",{
+        willReadFrequently:true
+    });
 
     const img=ctx.getImageData(
         0,
@@ -574,26 +611,56 @@ function enhanceIfNeeded(canvas){
 }
 
 /* -----------------------------
-   Debug
+   OCR 前整理
 ------------------------------ */
 
-function debugPreview(regions){
+async function prepareRegions(regions){
+
+    regions.unit=enhanceIfNeeded(
+        regions.unit
+    );
+
+    regions.locator=enhanceIfNeeded(
+        regions.locator
+    );
+
+    regions.asset=enhanceIfNeeded(
+        regions.asset
+    );
+
+    return regions;
+
+}
+
+/* -----------------------------
+   Debug（開發可開啟）
+------------------------------ */
+
+const DEBUG=false;
+
+function showDebug(regions){
+
+    if(!DEBUG) return;
 
     const wrap=document.createElement("div");
 
     wrap.style.position="fixed";
     wrap.style.right="10px";
     wrap.style.bottom="10px";
-    wrap.style.background="#fff";
+    wrap.style.background="#FFF";
+    wrap.style.border="1px solid #CCC";
     wrap.style.padding="8px";
-    wrap.style.zIndex="9999";
+    wrap.style.zIndex="99999";
 
-    [regions.unit,regions.locator,regions.asset]
-    .forEach(c=>{
+    [
+        regions.unit,
+        regions.locator,
+        regions.asset
+    ].forEach((canvas)=>{
 
         const img=new Image();
 
-        img.src=c.toDataURL();
+        img.src=canvas.toDataURL();
 
         img.style.width="180px";
         img.style.display="block";
@@ -608,22 +675,10 @@ function debugPreview(regions){
 }
 
 /* -----------------------------
-   OCR 前最後整理
+   Memory Cleanup
 ------------------------------ */
 
-async function prepareOCR(canvas){
-
-    const better=enhanceIfNeeded(canvas);
-
-    return better;
-
-}
-
-/* -----------------------------
-   記憶體釋放
------------------------------- */
-
-function releaseCanvas(canvas){
+function cleanupCanvas(canvas){
 
     canvas.width=1;
     canvas.height=1;
@@ -631,51 +686,40 @@ function releaseCanvas(canvas){
 }
 
 /* -----------------------------
-   最終 OCR Wrapper
------------------------------- */
-
-async function processRegions(regions){
-
-    regions.unit=await prepareOCR(regions.unit);
-
-    regions.locator=await prepareOCR(regions.locator);
-
-    regions.asset=await prepareOCR(regions.asset);
-
-    return await recognizeRegions(regions);
-
-}
-
-/* -----------------------------
-   覆寫主流程
+   覆寫 OCR Wrapper
 ------------------------------ */
 
 async function processImage(file){
 
-    await initOpenCV();
+    const image=await loadImage(file);
 
-    const img=await loadImage(file);
+    const source=createCanvas(
+        image.width,
+        image.height
+    );
 
-    const src=document.createElement("canvas");
-    const ctx=src.getContext("2d");
+    const ctx=source.getContext("2d");
 
-    src.width=img.width;
-    src.height=img.height;
+    ctx.drawImage(image,0,0);
 
-    ctx.drawImage(img,0,0);
+    const roi=detectWhiteLabel(source);
 
-    const roi=findWhiteLabel(src);
+    const crop=cropCanvas(source,roi);
 
-    const crop=cropCanvas(src,roi);
+    const enhanced=enhanceCanvas(crop);
 
-    const clean=preprocessROI(crop);
+    const regions=splitRegions(enhanced);
 
-    const regions=splitRegions(clean);
+    await prepareRegions(regions);
 
-    const result=await processRegions(regions);
+    showDebug(regions);
 
-    releaseCanvas(src);
-    releaseCanvas(crop);
+    const result=
+        await recognizeRegions(regions);
+
+    cleanupCanvas(source);
+    cleanupCanvas(crop);
+    cleanupCanvas(enhanced);
 
     return result;
 
