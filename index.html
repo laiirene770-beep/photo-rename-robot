@@ -4,11 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Photo Rename Robot V5.0</title>
+  <title>Photo Rename Robot V5.1</title>
 
   <link rel="stylesheet" href="style.css">
 
-  <!-- OCR -->
+  <!-- OpenCV.js -->
+  <script>
+    var Module = {
+      onRuntimeInitialized() {
+        console.log("✅ OpenCV Ready");
+      }
+    };
+  </script>
+  <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
+
+  <!-- Tesseract OCR -->
   <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <!-- ZIP -->
@@ -16,6 +26,7 @@
 
   <!-- Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 </head>
 
 <body>
@@ -24,11 +35,11 @@
 
   <!-- Header -->
   <header>
-    <h1>📷 Photo Rename Robot V5.0</h1>
-    <p>輔大設備照片 AI 辨識系統</p>
+    <h1>📷 Photo Rename Robot V5.1</h1>
+    <p>輔大設備照片 AI 白框辨識系統</p>
   </header>
 
-  <!-- 上傳區 -->
+  <!-- Upload -->
   <section class="upload-card">
 
     <div id="dropZone" class="drop-zone">
@@ -39,7 +50,6 @@
 
       <p>支援 JPG / JPEG / PNG</p>
 
-      <!-- 修正版 -->
       <input
         id="fileInput"
         type="file"
@@ -56,7 +66,7 @@
 
   </section>
 
-  <!-- 進度 -->
+  <!-- Progress -->
   <section class="progress-card">
 
     <div class="progress-top">
@@ -70,7 +80,7 @@
 
   </section>
 
-  <!-- 縮圖 -->
+  <!-- Preview -->
   <section class="preview-card">
 
     <div class="section-title">
@@ -82,7 +92,7 @@
 
   </section>
 
-  <!-- 結果 -->
+  <!-- Result -->
   <section class="result-card">
 
     <div class="section-title">
@@ -106,7 +116,9 @@
         <tbody id="resultBody">
 
           <tr class="empty-row">
-            <td colspan="5">尚未載入照片</td>
+            <td colspan="5">
+              尚未載入照片
+            </td>
           </tr>
 
         </tbody>
@@ -117,7 +129,7 @@
 
   </section>
 
-  <!-- 按鈕 -->
+  <!-- Buttons -->
   <section class="action-card">
 
     <button id="startBtn" class="primary">
@@ -147,7 +159,7 @@
 
 </div>
 
-<!-- JS -->
+<!-- JavaScript -->
 <script src="validator.js"></script>
 <script src="imageProcessor.js"></script>
 <script src="ocrEngine.js"></script>
