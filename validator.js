@@ -78,24 +78,17 @@ function validateUnit(raw){
    定位器 5碼
 -------------------------- */
 
-function validateLocator(raw){
+function validateLocator(text){
 
-  let text = normalizeDigits(raw);
+    text = normalizeDigits(text);
 
-  text = text.replace(/\D/g,"");
+    text = text.replace(/\D/g,"");
 
-  if(text.length > 5){
-      text = text.substring(0,5);
-  }
+    const m = text.match(/\d{5}/);
 
-  while(text.length < 5){
-      text = "0" + text;
-  }
-
-  return text;
+    return m ? m[0] : "00000";
 
 }
-
 /* -------------------------
    財產編號 6碼
 -------------------------- */
