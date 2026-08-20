@@ -1,64 +1,66 @@
-/* ocrEngine.js V5.2 */
+/* =====================================
+   Photo Rename Robot V6 Stable
+   ocrEngine.js
+===================================== */
 
 let worker = null;
 
-async function getWorker() {
+async function getWorker(){
 
-  if (worker) return worker;
+    if(worker) return worker;
 
-  worker = await Tesseract.createWorker("chi_tra+eng");
+    worker = await Tesseract.createWorker("chi_tra+eng");
 
-  await worker.setParameters({
-    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-    preserve_interword_spaces: "1"
-  });
+    return worker;
 
-  return worker;
 }
 
-async function canvasOCR(w, canvas, whitelist) {
+/* OCR */
 
-  await w.setParameters({
-    tessedit_char_whitelist: whitelist
-  });
+async function readCanvas(canvas, whitelist){
 
-  const { data } = await w.recognize(canvas);
+    const w = await getWorker();
 
-  return data.text.replace(/\s/g, "");
+    await w.setParameters({
+        tessedit_pageseg_mode: "7",
+        tessedit_char_whitelist: whitelist,
+        preserve_interword_spaces: "0"
+    });
+
+    const { data } = await w.recognize(canvas);
+
+    return data.text.replace(/\s/g,"").trim();
+
 }
 
-async function recognizeRegions(regions) {
+/* 三行 */
 
-  const w = await getWorker();
+async function recognizeRegions(regions){
 
-  const unit = validateUnit(
-    await canvasOCR(
-      w,
-      regions.unit,
-      "輔大ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    )
-  );
+    const unitRaw = await readCanvas(
+        regions.unit,
+        "輔大ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    );
 
-  const locator = validateLocator(
-    await canvasOCR(
-      w,
-      regions.locator,
-      "0123456789OISBQDl"
-    )
-  );
+    const locatorRaw = await readCanvas(
+        regions.locator,
+        "0123456789OISBQDl"
+    );
 
-  const asset = validateAsset(
-    await canvasOCR(
-      w,
-      regions.asset,
-      "0123456789OISBQDl"
-    )
-  );
+    const assetRaw = await readCanvas(
+        regions.asset,
+        "0123456789OISBQDl"
+    );
 
-  return {
-    unit,
-    locator,
-    asset,
-    confidence: 98
-  };
+    const unit = validateUnit(unitRaw);
+    const locator = validateLocator(locatorRaw);
+    const asset = validateAsset(assetRaw);
+
+    return{
+        unit,
+        locator,
+        asset,
+        confidence:95
+    };
+
 }
