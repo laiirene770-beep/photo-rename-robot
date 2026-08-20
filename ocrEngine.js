@@ -37,30 +37,29 @@ async function readCanvas(canvas, whitelist){
 
 async function recognizeRegions(regions){
 
+    // 第一行：仍使用 OCR
     const unitRaw = await readCanvas(
         regions.unit,
         "輔大ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     );
 
-    const locatorRaw = await readCanvas(
-        regions.locator,
-        "0123456789OISBQDl"
-    );
-
-    const assetRaw = await readCanvas(
-        regions.asset,
-        "0123456789OISBQDl"
-    );
-
     const unit = validateUnit(unitRaw);
-    const locator = validateLocator(locatorRaw);
-    const asset = validateAsset(assetRaw);
 
-    return{
+    // 第二行：5碼改用模板辨識
+    const locator = validateLocator(
+        recognizeFiveDigits(regions.locator)
+    );
+
+    // 第三行：6碼改用模板辨識
+    const asset = validateAsset(
+        recognizeSixDigits(regions.asset)
+    );
+
+    return {
         unit,
         locator,
         asset,
-        confidence:95
+        confidence: 98
     };
 
 }
