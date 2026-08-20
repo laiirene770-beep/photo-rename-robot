@@ -1,1 +1,0 @@
-將 index.html、style.css、app.js 覆蓋 GitHub 後 Commit，即可更新 Vercel。
