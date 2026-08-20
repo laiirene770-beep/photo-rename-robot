@@ -1,142 +1,64 @@
-/* ==========================================
-   Photo Rename Robot V5.0
-   ocrEngine.js
-========================================== */
+/* ocrEngine.js V5.2 */
 
-let workerReady = false;
 let worker = null;
 
-/* -----------------------------
-   建立 OCR Worker
------------------------------- */
+async function getWorker() {
 
-async function getWorker(){
+  if (worker) return worker;
 
-    if(workerReady) return worker;
+  worker = await Tesseract.createWorker("chi_tra+eng");
 
-    worker = await Tesseract.createWorker("eng+chi_tra");
+  await worker.setParameters({
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+    preserve_interword_spaces: "1"
+  });
 
-    workerReady = true;
-
-    return worker;
-
+  return worker;
 }
 
-/* -----------------------------
-   三區辨識
------------------------------- */
+async function canvasOCR(w, canvas, whitelist) {
 
-async function recognizeRegions(regions){
+  await w.setParameters({
+    tessedit_char_whitelist: whitelist
+  });
 
-    const w = await getWorker();
+  const { data } = await w.recognize(canvas);
 
-    /* 第一行：單位 */
-    await w.setParameters({
-        tessedit_pageseg_mode: 7,
-        tessedit_char_whitelist:
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz輔大 "
-    });
-
-    const unitText = await canvasOCR(w,regions.unit);
-
-    /* 第二行：5碼 */
-    await w.setParameters({
-        tessedit_pageseg_mode:7,
-        tessedit_char_whitelist:
-        "0123456789OISBQDl"
-    });
-
-    const locatorText = await canvasOCR(w,regions.locator);
-
-    /* 第三行：6碼 */
-    await w.setParameters({
-        tessedit_pageseg_mode:7,
-        tessedit_char_whitelist:
-        "0123456789OISBQDl"
-    });
-
-    const assetText = await canvasOCR(w,regions.asset);
-
-    /* 修正 */
-
-    const unit = validateUnit(unitText);
-
-    const locator = validateLocator(locatorText);
-
-    const asset = validateAsset(assetText);
-
-    const confidence = calculateConfidence(
-        unit,
-        locator,
-        asset
-    );
-
-    return{
-
-        unit,
-        locator,
-        asset,
-        confidence
-
-    };
-
+  return data.text.replace(/\s/g, "");
 }
 
-/* -----------------------------
-   Canvas OCR
------------------------------- */
+async function recognizeRegions(regions) {
 
-async function canvasOCR(worker,canvas){
+  const w = await getWorker();
 
-    const {data:{text}}
-    = await worker.recognize(canvas);
+  const unit = validateUnit(
+    await canvasOCR(
+      w,
+      regions.unit,
+      "輔大ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    )
+  );
 
-    return text
-        .replace(/\n/g,"")
-        .replace(/\s/g,"")
-        .trim();
+  const locator = validateLocator(
+    await canvasOCR(
+      w,
+      regions.locator,
+      "0123456789OISBQDl"
+    )
+  );
 
-}
+  const asset = validateAsset(
+    await canvasOCR(
+      w,
+      regions.asset,
+      "0123456789OISBQDl"
+    )
+  );
 
-/* -----------------------------
-   信心值
------------------------------- */
-
-function calculateConfidence(
+  return {
     unit,
     locator,
-    asset
-){
-
-    let score = 100;
-
-    if(unit==="未知單位") score-=20;
-
-    if(locator.length!==5) score-=30;
-
-    if(asset.length!==6) score-=30;
-
-    if(!/^輔大/.test(unit)) score-=15;
-
-    score=Math.max(0,score);
-
-    return score;
-
-}
-
-/* -----------------------------
-   Debug（開發用）
------------------------------- */
-
-async function previewOCR(canvas){
-
-    const w = await getWorker();
-
-    const result =
-    await w.recognize(canvas);
-
-    console.log(result.data.text);
-
-    return result.data.text;
-
+    asset,
+    confidence: 98
+  };
 }
